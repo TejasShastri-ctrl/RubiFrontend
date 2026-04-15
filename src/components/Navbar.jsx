@@ -1,0 +1,57 @@
+import { Icon } from './Icon'
+import { useNavigate } from 'react-router-dom'
+
+export function Navbar({ reviewer, searchValue, onSearchChange }) {
+  const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem("user") || "null");
+  const displayName = user ? user.name : reviewer ? reviewer.name : "User";
+  const displayRole = user ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : reviewer ? reviewer.role : "Guest";
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/");
+  };
+
+  return (
+    <header className="topbar">
+      <label className="searchbar" htmlFor="global-search">
+        <Icon name="search" size={16} />
+        <input
+          id="global-search"
+          type="search"
+          placeholder="search"
+          value={searchValue}
+          onChange={(event) => onSearchChange(event.target.value)}
+        />
+      </label>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+        <div className="reviewer-chip">
+          <div className="reviewer-avatar">
+            <Icon name="user" size={16} />
+          </div>
+          <div>
+            <div className="reviewer-name">{displayName}</div>
+            <div className="reviewer-role">{displayRole}</div>
+          </div>
+        </div>
+        
+        <button 
+          onClick={handleLogout}
+          className="logout-button"
+          style={{ 
+            background: 'none', 
+            border: 'none', 
+            color: '#ef4444', 
+            cursor: 'pointer',
+            fontWeight: '600',
+            fontSize: '0.9rem'
+          }}
+        >
+          Logout
+        </button>
+      </div>
+    </header>
+  )
+}
