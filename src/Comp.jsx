@@ -32,7 +32,7 @@ const tableColumns = [
   {
     key: 'status',
     label: 'Status',
-    render: (item) => <StatusPill status={item.status?.type || 'pending'} />,
+    render: (item) => <StatusPill status={item.status?.state || 'pending'} />,
   },
 ]
 
@@ -44,6 +44,7 @@ function Dashboard() {
   const [reviewView, setReviewView] = useState('review')
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
+  const [reviewerComment, setReviewerComment] = useState('')
 
   const fetchLogs = async (taskId) => {
     try {
@@ -82,46 +83,73 @@ function Dashboard() {
     }
   }
 
-  const handleTaskSelect = async (taskId) => {
+  const handleTaskSelect = (taskId) => {
+    setSelectedTaskId(taskId)
+    setReviewView('review')
+    setActivePage('review')
+  }
+
+  const handleLockTask = async () => {
     try {
       const token = localStorage.getItem('token')
-      await axios.post(`/api/reviews/${taskId}/lock`, {}, {
+      await axios.post(`/api/reviews/${selectedTaskId}/lock`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setSelectedTaskId(taskId)
-      setReviewView('review')
-      setActivePage('review')
+      await fetchTasks()
     } catch (err) {
       console.error('Failed to lock task:', err)
+      alert(`Locking failed: ${err.response?.data?.msg || err.message}`)
     }
   }
+
+  const handleUnlockTask = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      await axios.post(`/api/reviews/${selectedTaskId}/unlock`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      await fetchTasks();
+      setSelectedTaskId(null)
+      setActivePage('overview')
+    } catch (err) {
+      console.error('Failed to unlock task:', err)
+      alert(`Error releasing lock: ${err.response?.data?.msg || err.message}`)
+    }
+  }
+
+// REMOVED: handlePutUnderReview (handled by auto-lock)
 
   const handleSubmitDecision = async (decision) => {
     try {
       const token = localStorage.getItem('token')
+      const comment = reviewerComment || `${decision.charAt(0).toUpperCase() + decision.slice(1)} by reviewer`;
+      
       await axios.post(`/api/reviews/${selectedTaskId}/submit`, { 
         decision, 
-        comment: `${decision.charAt(0).toUpperCase() + decision.slice(1)} by reviewer` 
+        comment
       }, {
         headers: { Authorization: `Bearer ${token}` }
       })
       
-      // Refresh tasks and return to overview
+      // Clear state and refresh
+      setReviewerComment('')
       fetchTasks()
       setActivePage('overview')
       setSelectedTaskId(null)
     } catch (err) {
       console.error('Failed to submit decision:', err)
+      alert(`Submission failed: ${err.response?.data?.error || err.message}`)
     }
   }
 
   const selectedTask = tasks.find((item) => item._id === selectedTaskId)
 
   const navItems = useMemo(() => [
-    { id: 'overview', label: 'All My Tasks', count: tasks.length, accent: 'blue' },
-    { id: 'pending', label: 'Pending', count: tasks.filter(t => !t.status?.type).length, accent: 'amber' },
-    { id: 'completed', label: 'Approved', count: tasks.filter(t => t.status?.type === 'approved').length, accent: 'green' },
-    { id: 'rejected', label: 'Rejected', count: tasks.filter(t => t.status?.type === 'rejected').length, accent: 'red' },
+    { id: 'overview', label: 'All Tasks', count: tasks.length, accent: 'blue' },
+    { id: 'pending', label: 'Global Pool', count: tasks.filter(t => (t.status?.state === 'pending' || !t.status?.state) && !t.isLocked).length, accent: 'amber' },
+    { id: 'active', label: 'My Active Work', count: tasks.filter(t => t.status?.state === 'under_review' || t.isLocked).length, accent: 'indigo' },
+    { id: 'completed', label: 'Completed', count: tasks.filter(t => t.status?.state === 'approved').length, accent: 'green' },
+    { id: 'rejected', label: 'Rejected', count: tasks.filter(t => t.status?.state === 'rejected').length, accent: 'red' },
   ], [tasks])
 
   const filteredItems = useMemo(() => {
@@ -132,8 +160,10 @@ function Dashboard() {
         activePage === 'overview'
           ? true
           : activePage === 'completed'
-            ? item.status?.type === 'approved'
-            : item.status?.type === activePage || (!item.status?.type && activePage === 'pending')
+            ? item.status?.state === 'approved'
+            : activePage === 'active'
+              ? (item.status?.state === 'under_review' || item.isLocked)
+              : item.status?.state === activePage
       
       const matchesQuery =
         normalizedQuery.length === 0 ||
@@ -168,6 +198,7 @@ function Dashboard() {
               items={filteredItems}
               onTaskSelect={handleTaskSelect}
               selectedTask={selectedTask}
+              tasks={tasks}
             />
           )}
 
@@ -189,6 +220,15 @@ function Dashboard() {
             />
           )}
 
+          {activePage === 'active' && (
+            <QueuePage
+              title="My Active Work"
+              description="Tasks you have currently locked and are reviewing."
+              items={filteredItems}
+              onTaskSelect={handleTaskSelect}
+            />
+          )}
+
           {activePage === 'rejected' && (
             <QueuePage
               title="Rejected Outputs"
@@ -204,8 +244,15 @@ function Dashboard() {
               history={history}
               reviewView={reviewView}
               onReviewViewChange={setReviewView}
-              onBack={() => setActivePage('overview')}
+              onBack={() => {
+                setActivePage('overview');
+                fetchTasks(); // Refresh list on back
+              }}
+              onLock={handleLockTask}
+              onUnlock={handleUnlockTask}
               onSubmit={handleSubmitDecision}
+              comment={reviewerComment}
+              onCommentChange={setReviewerComment}
             />
           )}
           {activePage === 'audit' && <AuditPage />}
@@ -216,7 +263,7 @@ function Dashboard() {
   )
 }
 
-function OverviewPage({ items, onTaskSelect, selectedTask }) {
+function OverviewPage({ items, onTaskSelect, selectedTask, tasks }) {
   return (
     <section className="page-section">
       <PageHeader
@@ -226,9 +273,24 @@ function OverviewPage({ items, onTaskSelect, selectedTask }) {
       />
 
       <div className="stats-grid">
-        {statCards.map((card) => (
-          <StatCard key={card.label} {...card} />
-        ))}
+        <StatCard 
+          label="Total Handled" 
+          value={tasks.filter(t => ['approved', 'rejected'].includes(t.status?.state)).length}
+          trend="+12%" 
+          trendStyle="up"
+        />
+        <StatCard 
+          label="Current Queue" 
+          value={tasks.filter(t => t.status?.state === 'pending').length}
+          trend="-2" 
+          trendStyle="down"
+        />
+        <StatCard 
+          label="Active Session" 
+          value={tasks.filter(t => t.status?.state === 'under_review').length}
+          trend="Live" 
+          trendStyle="up"
+        />
       </div>
 
       <Panel
@@ -276,7 +338,11 @@ function ReviewDetailPage({
   reviewView,
   onReviewViewChange,
   onBack,
+  onLock,
+  onUnlock,
   onSubmit,
+  comment,
+  onCommentChange,
 }) {
   if (!task) return <div>No task selected</div>;
 
@@ -336,12 +402,69 @@ function ReviewDetailPage({
               <div className="review-bubble review-bubble--answer">{task.aiOutput}</div>
             </div>
 
+            {task.isLocked && !['approved', 'rejected'].includes(task.status?.state) && (
+              <div className="review-block reasoning-input animate-fade-in">
+                <label className="review-label" style={{ color: 'var(--blue-600)', fontWeight: '600' }}>Reviewer Reasoning (Required):</label>
+                <textarea
+                  className="review-textarea"
+                  placeholder="Record your observation or justification for this decision..."
+                  value={comment}
+                  onChange={(e) => onCommentChange(e.target.value)}
+                  style={{ 
+                    width: '100%', 
+                    minHeight: '120px', 
+                    padding: '12px', 
+                    borderRadius: '12px', 
+                    border: '2px solid var(--blue-100)', 
+                    background: 'var(--blue-50)',
+                    fontFamily: 'inherit',
+                    fontSize: '0.95rem',
+                    transition: 'all 0.2s ease',
+                    marginTop: '8px',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--blue-400)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--blue-100)'}
+                />
+              </div>
+            )}
+
             <div className="review-block">
               <label className="review-label">Actions:</label>
-              <div className="review-actions">
-                <Button variant="danger" onClick={() => onSubmit('rejected')}>Reject</Button>
-                <Button variant="warning" onClick={() => onSubmit('needs_review')}>Mark As Review</Button>
-                <Button variant="success" onClick={() => onSubmit('approved')}>Approve</Button>
+              <div className="review-actions" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                {!['approved', 'rejected'].includes(task.status?.state) && (
+                  <>
+                    {!task.isLocked ? (
+                      <Button variant="success" onClick={onLock}>Lock Task</Button>
+                    ) : (
+                      <>
+                        <Button variant="ghost" onClick={onUnlock}>Release Lock</Button>
+                        <div style={{ flex: 1 }}></div>
+                        <Button 
+                          variant="danger" 
+                          disabled={!comment?.trim()}
+                          onClick={() => onSubmit('rejected')}
+                          style={{ opacity: !comment?.trim() ? 0.5 : 1 }}
+                        >
+                          Reject
+                        </Button>
+                        <Button 
+                          variant="success" 
+                          disabled={!comment?.trim()}
+                          onClick={() => onSubmit('approved')}
+                          style={{ opacity: !comment?.trim() ? 0.5 : 1 }}
+                        >
+                          Approve Task
+                        </Button>
+                      </>
+                    )}
+                  </>
+                )}
+                {['approved', 'rejected'].includes(task.status?.state) && (
+                   <div className="status-badge" style={{ padding: '10px', borderRadius: '8px', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                     Status: <strong>{task.status.state.toUpperCase()}</strong>
+                   </div>
+                )}
               </div>
             </div>
           </div>

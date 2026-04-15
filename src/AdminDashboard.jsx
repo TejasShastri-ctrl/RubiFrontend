@@ -9,7 +9,9 @@ import { InfoPair } from './components/InfoPair'
 import { StatusPill } from './components/StatusPill'
 
 const queueItems = [
-  { id: 'all', label: 'All Users', accent: 'blue' },
+  { id: 'all_reviewers', label: 'All Reviewers', accent: 'slate' },
+  { id: 'all', label: 'All Tasks', accent: 'blue' },
+  { id: 'under_review', label: 'Under Review', accent: 'purple' },
   { id: 'approved', label: 'Approved', accent: 'green' },
   { id: 'rejected', label: 'Rejected', accent: 'red' },
   { id: 'pending', label: 'Pending', accent: 'amber' },
@@ -23,7 +25,8 @@ const toolItems = [
 
 const reviewerColumns = [
   { key: 'name', label: 'Reviewer' },
-  { key: 'total', label: 'Content Reviewed', render: (row) => row.approved + row.rejected + row.pending },
+  { key: 'total', label: 'Total Tasks' },
+  { key: 'under_review', label: 'Active' },
   { key: 'approved', label: 'Approved' },
   { key: 'rejected', label: 'Rejected' },
   { key: 'pending', label: 'Pending' },
@@ -31,7 +34,7 @@ const reviewerColumns = [
 
 const historyColumns = [
   { key: 'updatedAt', label: 'Timestamp', render: (row) => new Date(row.status?.updatedAt || row.createdAt).toLocaleString() },
-  { key: 'type', label: 'Status', render: (row) => <StatusPill status={row.status?.type || 'pending'} /> },
+  { key: 'state', label: 'Status', render: (row) => <StatusPill status={row.status?.state || 'pending'} /> },
   {
     key: 'aiPrompt',
     label: 'AI Prompt',
@@ -46,15 +49,21 @@ const historyColumns = [
 
 function AdminDashboard() {
   const [searchValue, setSearchValue] = useState('')
-  const [activeQueue, setActiveQueue] = useState('all')
+  const [activeQueue, setActiveQueue] = useState('all_reviewers')
   const [activeTool, setActiveTool] = useState('')
   const [screen, setScreen] = useState('overview')
+  const [viewMode, setViewMode] = useState('reviewers') // 'reviewers' or 'tasks'
   
   const [reviewers, setReviewers] = useState([])
+  const [globalTasks, setGlobalTasks] = useState([])
   const [selectedReviewerId, setSelectedReviewerId] = useState(null)
-  const [reviewerHistory, setReviewerHistory] = useState({ approved: [], rejected: [], pending: [] })
+  const [reviewerHistory, setReviewerHistory] = useState({ approved: [], rejected: [], pending: [], underReview: [] })
   const [selectedRecord, setSelectedRecord] = useState(null)
+  const [recordLogs, setRecordLogs] = useState([])
   const [loading, setLoading] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalConfig, setModalConfig] = useState({ action: '', reviewId: '', defaultComment: '' })
 
   // Fetch stats on mount
   useEffect(() => {
@@ -81,25 +90,32 @@ function AdminDashboard() {
   const dynamicQueueItems = useMemo(() => {
     return queueItems.map(item => {
       let count = 0;
-      if (item.id === 'all') count = reviewers.length;
-      if (item.id === 'approved') count = reviewers.filter(r => r.approved > 0).length;
-      if (item.id === 'rejected') count = reviewers.filter(r => r.rejected > 0).length;
-      if (item.id === 'pending') count = reviewers.filter(r => r.pending > 0).length;
+      if (viewMode === 'reviewers') {
+        if (item.id === 'all_reviewers') count = reviewers.length;
+        if (item.id === 'approved') count = reviewers.filter(r => r.approved > 0).length;
+        if (item.id === 'rejected') count = reviewers.filter(r => r.rejected > 0).length;
+        if (item.id === 'pending') count = reviewers.filter(r => r.pending > 0).length;
+      } else {
+        count = globalTasks.length; // Simplified for now, backend gives filtered results
+      }
       return { ...item, count };
     });
-  }, [reviewers]);
+  }, [reviewers, globalTasks, viewMode]);
 
   const filteredReviewers = useMemo(() => {
     const normalizedQuery = searchValue.trim().toLowerCase()
 
-    return reviewers.filter((reviewer) => {
+    const list = reviewers.filter((reviewer) => {
+      // Show ALL reviewers if activeQueue is 'all_reviewers'
+      if (activeQueue === 'all_reviewers') return true;
+
       const matchesQueue =
-        activeQueue === 'all'
-          ? true
-          : activeQueue === 'approved'
-            ? reviewer.approved > 0
-            : activeQueue === 'rejected'
-              ? reviewer.rejected > 0
+        activeQueue === 'approved'
+          ? reviewer.approved > 0
+          : activeQueue === 'rejected'
+            ? reviewer.rejected > 0
+            : activeQueue === 'under_review'
+              ? reviewer.under_review > 0
               : reviewer.pending > 0
 
       const matchesQuery =
@@ -110,12 +126,42 @@ function AdminDashboard() {
 
       return matchesQueue && matchesQuery
     })
+
+    // SORT: Reviewers with any work (total > 0) come first
+    return [...list].sort((a, b) => {
+      if (a.total > 0 && b.total === 0) return -1;
+      if (a.total === 0 && b.total > 0) return 1;
+      return b.total - a.total; // Then sort by volume
+    });
   }, [activeQueue, searchValue, reviewers])
 
   const handleQueueSelect = (itemId) => {
     setActiveQueue(itemId)
     setActiveTool('')
-    setScreen('overview')
+    
+    if (itemId === 'all_reviewers') {
+      setViewMode('reviewers')
+      setScreen('overview')
+    } else {
+      setViewMode('tasks')
+      setScreen('tasks')
+      fetchGlobalTasks(itemId)
+    }
+  }
+
+  const fetchGlobalTasks = async (status) => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get(`/api/admin/tasks?status=${status}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setGlobalTasks(response.data)
+    } catch (err) {
+      console.error('Failed to fetch tasks:', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleToolSelect = (itemId) => {
@@ -143,9 +189,20 @@ function AdminDashboard() {
     setScreen('history')
   }
 
-  const openRecordDetail = (record) => {
+  const openRecordDetail = async (record) => {
     setSelectedRecord(record)
     setScreen('detail')
+    
+    // Fetch logs for history
+    try {
+      const token = localStorage.getItem('token')
+      const response = await axios.get(`/api/reviews/${record._id}/logs`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      setRecordLogs(response.data)
+    } catch (err) {
+      console.error('Failed to fetch logs:', err)
+    }
   }
 
   const handleReassign = async (reviewId, reviewerId) => {
@@ -162,18 +219,41 @@ function AdminDashboard() {
     }
   }
 
-  const handleAdminModify = async (reviewId, decision, comment) => {
+  const handleAdminModify = (reviewId, action, defaultComment) => {
+    setModalConfig({ reviewId, action, defaultComment });
+    setModalOpen(true);
+  }
+
+  const submitAdminModify = async (comment, target) => {
+    const { reviewId, action } = modalConfig;
     try {
-      const token = localStorage.getItem('token')
-      await axios.post(`/api/admin/${reviewId}/modify`, { decision, comment }, {
+      const token = localStorage.getItem('token');
+      await axios.post(`/api/admin/${reviewId}/modify`, { 
+        decision: action, 
+        comment,
+        target: action === 'send_back' ? target : 'reviewer'
+      }, {
         headers: { Authorization: `Bearer ${token}` }
-      })
+      });
+
+      setModalOpen(false);
       // Refresh data
-      if (selectedReviewerId) fetchReviewerDetails(selectedReviewerId)
-      fetchStats()
-      setScreen('history')
+      if (selectedReviewerId) fetchReviewerDetails(selectedReviewerId);
+      fetchStats();
+      if (selectedRecord && selectedRecord._id === reviewId) {
+        const refreshRes = await axios.get('/api/admin/tasks', { headers: { Authorization: `Bearer ${token}` } });
+        const updatedRecord = refreshRes.data.find(r => r._id === reviewId);
+        if (updatedRecord) {
+             setSelectedRecord(updatedRecord);
+             // Also refresh logs
+             const logsRes = await axios.get(`/api/reviews/${reviewId}/logs`, { headers: { Authorization: `Bearer ${token}` } });
+             setRecordLogs(logsRes.data);
+        }
+      }
+      setScreen('overview'); // Return for safety
     } catch (err) {
-      console.error('Failed to modify review:', err)
+      console.error('Action failed:', err);
+      alert(err.response?.data?.error || "Action failed");
     }
   }
 
@@ -219,6 +299,14 @@ function AdminDashboard() {
             />
           ) : null}
 
+          {screen === 'tasks' ? (
+            <AdminGlobalQueue
+              title={`${activeQueue.charAt(0).toUpperCase() + activeQueue.slice(1).replace('_', ' ')} Tasks`}
+              tasks={globalTasks}
+              onRecordSelect={openRecordDetail}
+            />
+          ) : null}
+
           {screen === 'history' ? (
             <AdminHistory
               reviewer={selectedReviewer}
@@ -231,13 +319,24 @@ function AdminDashboard() {
             <AdminDetail 
               reviewer={selectedReviewer} 
               record={selectedRecord} 
+              logs={recordLogs}
               onModify={handleAdminModify}
               onReassign={handleReassign}
               reviewers={reviewers}
+              showHistory={showHistory}
+              onToggleHistory={() => setShowHistory(!showHistory)}
             />
           ) : null}
         </section>
       </main>
+
+      {modalOpen && (
+        <AdminActionModal 
+          config={modalConfig} 
+          onClose={() => setModalOpen(false)} 
+          onSubmit={submitAdminModify} 
+        />
+      )}
     </div>
   )
 }
@@ -262,8 +361,13 @@ function AdminOverview({ reviewers, onReviewerSelect }) {
 }
 
 function AdminHistory({ reviewer, history, onRecordSelect }) {
-  // Combine approved, rejected, pending into one list
-  const allHistory = [...history.approved, ...history.rejected, ...history.pending];
+  // Combine approved, rejected, pending, underReview into one list
+  const allHistory = [
+    ...(history.approved || []),
+    ...(history.rejected || []),
+    ...(history.pending || []),
+    ...(history.underReview || [])
+  ];
 
   return (
     <div className="admin-screen admin-screen--panel">
@@ -288,7 +392,97 @@ function AdminHistory({ reviewer, history, onRecordSelect }) {
   )
 }
 
-function AdminDetail({ reviewer, record, onModify, onReassign, reviewers }) {
+function AdminGlobalQueue({ title, tasks, onRecordSelect }) {
+  const globalColumns = [
+    ...historyColumns,
+    { 
+      key: 'assignedTo', 
+      label: 'Assigned To', 
+      render: (row) => row.assignedTo?.name || 'Unassigned' 
+    },
+    { 
+      key: 'lockedBy', 
+      label: 'Lock Status', 
+      render: (row) => row.isLocked ? (
+        <span className="lock-badge">🔒 {row.lockedBy?.name || 'Locked'}</span>
+      ) : '---' 
+    }
+  ];
+
+  return (
+    <div className="admin-screen">
+      <div className="admin-copy-block">
+        <div className="admin-section-label">Queue:</div>
+        <div className="admin-section-title">{title}</div>
+      </div>
+
+      <section className="admin-table-card">
+        <DataTable
+          columns={globalColumns}
+          rows={tasks}
+          onRowClick={(row) => onRecordSelect(row)}
+        />
+      </section>
+    </div>
+  )
+}
+
+function AdminActionModal({ config, onClose, onSubmit }) {
+  const [comment, setComment] = useState(config.defaultComment || '')
+  const [target, setTarget] = useState('pool')
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-card animate-scale-in">
+        <h3 className="modal-title">Admin Override: {config.action.replace('_', ' ').toUpperCase()}</h3>
+        <p className="modal-subtitle">Provide mandatory reasoning for this structural workflow change.</p>
+        
+        <div className="modal-body">
+          <label className="modal-label">Decision Reason:</label>
+          <textarea 
+            className="modal-textarea"
+            placeholder="Describe why this manual intervention is necessary..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+          />
+
+          {config.action === 'send_back' && (
+            <div className="target-selector">
+              <label className="modal-label">Assignment Target:</label>
+              <div className="selector-group">
+                <button 
+                  className={`selector-btn ${target === 'pool' ? 'is-active' : ''}`} 
+                  onClick={() => setTarget('pool')}
+                >
+                  Global Pool
+                </button>
+                <button 
+                  className={`selector-btn ${target === 'reviewer' ? 'is-active' : ''}`} 
+                  onClick={() => setTarget('reviewer')}
+                >
+                  Original Reviewer
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-ghost" onClick={onClose}>Cancel</button>
+          <button 
+            className="btn-primary" 
+            disabled={!comment.trim()} 
+            onClick={() => onSubmit(comment, target)}
+          >
+            Execute Override
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AdminDetail({ reviewer, record, logs, onModify, onReassign, reviewers, showHistory, onToggleHistory }) {
   if (!record) return <div>No record selected</div>;
 
   return (
@@ -298,24 +492,40 @@ function AdminDetail({ reviewer, record, onModify, onReassign, reviewers }) {
           Content Details
         </button>
         <button className="admin-detail-chip" type="button">
-          {reviewer?.name || 'Unassigned'}
+          {record.assignedTo?.name || reviewer?.name || 'Unassigned'}
         </button>
         
-        <div className="reassign-box" style={{ marginTop: '20px', padding: '10px' }}>
-          <label style={{ fontSize: '0.8rem', color: '#64748b' }}>
-            {reviewer ? 'Reassign to:' : 'Assign to:'}
-          </label>
-          <select 
-            onChange={(e) => onReassign(record._id, e.target.value)}
-            className="reassign-select"
-            style={{ width: '100%', padding: '5px', marginTop: '5px', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'pointer' }}
-          >
-            <option value="">Select Reviewer</option>
-            {reviewers.map(r => (
-              <option key={r.reviewerId} value={r.reviewerId}>{r.name}</option>
-            ))}
-          </select>
-        </div>
+        {record.isLocked && (
+          <div className="lock-indicator-card">
+            <div className="admin-detail-label">Current Lock:</div>
+            <div className="lock-badge is-active">
+              🔒 Locked by {record.lockedBy?.name || 'Reviewer'}
+            </div>
+          </div>
+        )}
+
+        {(record.status?.state === 'approved' || record.status?.state === 'rejected') && !record.isLocked && (
+          <div className="reassign-box" style={{ marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#475569', marginBottom: '8px', display: 'block' }}>
+              Assign to New Reviewer:
+            </label>
+            <select 
+              onChange={(e) => {
+                if (e.target.value) onReassign(record._id, e.target.value);
+              }}
+              className="reassign-select"
+              style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'pointer', background: 'white' }}
+            >
+              <option value="">Select User...</option>
+              {reviewers.map(r => (
+                <option key={r.reviewerId} value={r.reviewerId}>{r.name}</option>
+              ))}
+            </select>
+            <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '8px' }}>
+              * This will reset the task to Pending.
+            </p>
+          </div>
+        )}
       </aside>
 
       <section className="admin-detail-stage">
@@ -329,27 +539,76 @@ function AdminDetail({ reviewer, record, onModify, onReassign, reviewers }) {
           <div className="admin-bubble admin-bubble--answer">{record.aiOutput}</div>
         </div>
 
+        <div className="admin-detail-block">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div className="admin-detail-label" style={{ marginBottom: 0 }}>Audit History:</div>
+            <Button variant="ghost" size="sm" onClick={onToggleHistory}>
+              {showHistory ? 'Hide History' : 'View Audit History'}
+            </Button>
+          </div>
+          
+          {showHistory && (
+             <div className="audit-timeline-shell fade-in">
+               {logs.length === 0 ? (
+                 <div className="no-logs">No activity recorded yet for this task.</div>
+               ) : (
+                 <div className="timeline-trail">
+                   {logs.map((log, i) => (
+                     <div key={i} className="timeline-item">
+                       <div className="timeline-marker">
+                         <div className={`marker-dot marker--${log.action}`}></div>
+                         {i !== logs.length - 1 && <div className="marker-line"></div>}
+                       </div>
+                       <div className="timeline-content">
+                         <div className="timeline-header">
+                           <span className="timeline-action">{log.action.replace('_', ' ')}</span>
+                           <span className="timeline-time">{new Date(log.createdAt).toLocaleString()}</span>
+                         </div>
+                         <div className="timeline-meta">
+                           <span className="timeline-user">{log.performedBy?.name || 'System'}</span>
+                           <span className="timeline-role">({log.performedBy?.role || 'Service'})</span>
+                         </div>
+                         <div className="timeline-message">{log.comment}</div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
+             </div>
+          )}
+        </div>
+
         <div className="admin-detail-footer">
-          <InfoPair label="Timestamp" value={new Date(record.status?.updatedAt || record.createdAt).toLocaleString()} />
+          <InfoPair label="Last Updated" value={new Date(record.status?.updatedAt || record.createdAt).toLocaleString()} />
           <div className="admin-detail-status">
             <div className="info-pair__label">Current Status</div>
-            <StatusPill status={record.status?.type || 'pending'} />
+            <StatusPill status={record.status?.state || 'pending'} />
           </div>
           <div className="admin-detail-actions">
-            <Button 
-              variant="warning" 
-              icon="warning" 
-              onClick={() => onModify(record._id, 'pending', 'Sent back by admin')}
-            >
-              Send Back
-            </Button>
-            <Button 
-              variant="primary" 
-              icon="edit"
-              onClick={() => onModify(record._id, 'approved', 'Approved by admin')}
-            >
-              Approve
-            </Button>
+            {(record.status?.state === 'approved' || record.status?.state === 'rejected') ? (
+              <>
+                <Button 
+                  variant="warning" 
+                  icon="warning" 
+                  onClick={() => onModify(record._id, 'send_back', 'Sent for manual verification.')}
+                >
+                  Send Back
+                </Button>
+                <Button 
+                  variant="primary" 
+                  icon="edit"
+                  onClick={() => onModify(record._id, 'approved', 'Re-verified by admin')}
+                >
+                  Force Approve
+                </Button>
+              </>
+            ) : (
+               <div style={{ background: '#f1f5f9', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%' }}>
+                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic', textAlign: 'center' }}>
+                   🔒 Task is currently in workflow ({record.status?.state}). Actions locked for supervisors.
+                 </p>
+               </div>
+            )}
           </div>
         </div>
       </section>
