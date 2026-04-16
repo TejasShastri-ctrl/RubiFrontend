@@ -33,8 +33,8 @@ const reviewerColumns = [
 ]
 
 const historyColumns = [
-  { key: 'updatedAt', label: 'Timestamp', render: (row) => new Date(row.status?.updatedAt || row.createdAt).toLocaleString() },
-  { key: 'state', label: 'Status', render: (row) => <StatusPill status={row.status?.state || 'pending'} /> },
+  { key: 'updatedAt', label: 'Timestamp', render: (row) => new Date(row.status?.updatedAt || row.updatedAt || row.createdAt).toLocaleString() },
+  { key: 'state', label: 'Status', render: (row) => <StatusPill status={row.status?.state || row.status || 'pending'} /> },
   {
     key: 'aiPrompt',
     label: 'AI Prompt',
@@ -94,6 +94,7 @@ function AdminDashboard() {
         if (item.id === 'all_reviewers') count = reviewers.length;
         if (item.id === 'approved') count = reviewers.filter(r => r.approved > 0).length;
         if (item.id === 'rejected') count = reviewers.filter(r => r.rejected > 0).length;
+        if (item.id === 'under_review') count = reviewers.filter(r => r.under_review > 0).length;
         if (item.id === 'pending') count = reviewers.filter(r => r.pending > 0).length;
       } else {
         count = globalTasks.length; // Simplified for now, backend gives filtered results
@@ -565,8 +566,15 @@ function AdminDetail({ reviewer, record, logs, onModify, onReassign, reviewers, 
                            <span className="timeline-time">{new Date(log.createdAt).toLocaleString()}</span>
                          </div>
                          <div className="timeline-meta">
-                           <span className="timeline-user">{log.performedBy?.name || 'System'}</span>
-                           <span className="timeline-role">({log.performedBy?.role || 'Service'})</span>
+                           <span className="timeline-user">
+                             By: {log.performedBy?.name || `User (${log.performedBy?.role || 'Unknown'})`}
+                           </span>
+                           <span className="timeline-role" style={{ fontSize: '0.7rem', opacity: 0.8 }}> ({log.performedBy?.role || log.role})</span>
+                           {log.assignedTo && (
+                             <div className="timeline-assignment-note" style={{ fontSize: '0.75rem', marginTop: '4px', color: '#64748b' }}>
+                               <span style={{ fontWeight: 600 }}>Assigned To:</span> {log.assignedTo.name || 'Unassigned'}
+                             </div>
+                           )}
                          </div>
                          <div className="timeline-message">{log.comment}</div>
                        </div>

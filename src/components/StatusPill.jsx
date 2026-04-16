@@ -1,5 +1,7 @@
 export function StatusPill({ status }) {
-  const s = (status || 'pending').toLowerCase();
+  // Defensive extraction: handle string, nested state, or object-fallback
+  const rawStatus = typeof status === 'object' ? status?.state : status;
+  const s = (rawStatus || 'pending').toString().toLowerCase();
   
   const tone = {
     approved: 'green',

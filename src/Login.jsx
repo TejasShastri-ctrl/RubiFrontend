@@ -113,7 +113,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="rounded-full w-[140px] bg-[#2e4d3d] py-2 text-white transition hover:opacity-90 disabled:opacity-50"
+              className="rounded-full w-[140px] bg-[#2e4d3d] py-2 cursor-pointer text-white transition hover:opacity-90 disabled:opacity-50"
             >
               {loading ? "Logging in..." : "Login"}
             </button>
@@ -163,4 +163,4 @@ export default function Login() {
       </div>
     </div>
   );
-}
+}
