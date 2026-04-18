@@ -55,6 +55,7 @@ function AdminDashboard() {
   const [viewMode, setViewMode] = useState('reviewers') // 'reviewers' or 'tasks'
   
   const [reviewers, setReviewers] = useState([])
+  const [summary, setSummary] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, under_review: 0 })
   const [globalTasks, setGlobalTasks] = useState([])
   const [selectedReviewerId, setSelectedReviewerId] = useState(null)
   const [reviewerHistory, setReviewerHistory] = useState({ approved: [], rejected: [], pending: [], underReview: [] })
@@ -77,7 +78,8 @@ function AdminDashboard() {
       const response = await axios.get('/api/admin/stats', {
         headers: { Authorization: `Bearer ${token}` }
       })
-      setReviewers(response.data)
+      setReviewers(response.data.reviewers)
+      setSummary(response.data.summary)
     } catch (err) {
       console.error('Failed to fetch stats:', err)
     } finally {
@@ -90,18 +92,16 @@ function AdminDashboard() {
   const dynamicQueueItems = useMemo(() => {
     return queueItems.map(item => {
       let count = 0;
-      if (viewMode === 'reviewers') {
-        if (item.id === 'all_reviewers') count = reviewers.length;
-        if (item.id === 'approved') count = reviewers.filter(r => r.approved > 0).length;
-        if (item.id === 'rejected') count = reviewers.filter(r => r.rejected > 0).length;
-        if (item.id === 'under_review') count = reviewers.filter(r => r.under_review > 0).length;
-        if (item.id === 'pending') count = reviewers.filter(r => r.pending > 0).length;
+      if (item.id === 'all_reviewers') {
+        count = reviewers.length;
       } else {
-        count = globalTasks.length; // Simplified for now, backend gives filtered results
+        const key = item.id === 'all' ? 'total' : item.id;
+        // Use global summary from backend (includes unassigned)
+        count = summary[key] || 0;
       }
       return { ...item, count };
     });
-  }, [reviewers, globalTasks, viewMode]);
+  }, [reviewers, summary]);
 
   const filteredReviewers = useMemo(() => {
     const normalizedQuery = searchValue.trim().toLowerCase()
