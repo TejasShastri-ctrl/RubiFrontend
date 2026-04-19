@@ -45,6 +45,7 @@ function Dashboard() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [reviewerComment, setReviewerComment] = useState('')
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const fetchLogs = async (taskId) => {
     try {
@@ -190,6 +191,8 @@ function Dashboard() {
           reviewer={reviewerProfile}
           searchValue={query}
           onSearchChange={setQuery}
+          onProfileClick={() => setProfileOpen((o) => !o)}
+          profileOpen={profileOpen}
         />
 
         <div className="app-content">
@@ -259,6 +262,10 @@ function Dashboard() {
           {activePage === 'settings' && <SettingsPage />}
         </div>
       </main>
+
+      {profileOpen && (
+        <ProfileCard onClose={() => setProfileOpen(false)} />
+      )}
     </div>
   )
 }
@@ -570,6 +577,60 @@ function SettingRow({ label, value }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
+  )
+}
+
+function ProfileCard({ onClose }) {
+  const user = JSON.parse(localStorage.getItem('user') || 'null')
+  const name    = user?.name   || 'Reviewer'
+  const email   = user?.email  || '—'
+  const role    = user?.role   ? (user.role.charAt(0).toUpperCase() + user.role.slice(1)) : 'Reviewer'
+  const mobile  = user?.mobile || '—'
+  const initials = name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+
+  return (
+    <>
+      <div className="profile-backdrop" onClick={onClose} />
+      <div className="profile-card animate-scale-in">
+        <button className="profile-card__close" onClick={onClose} title="Close">
+          ×
+        </button>
+
+        <div className="profile-card__avatar">
+          <span className="profile-card__initials">{initials}</span>
+          <span className="profile-card__status-dot" />
+        </div>
+
+        <div className="profile-card__name">{name}</div>
+        <div className="profile-card__role">{role}</div>
+
+        <div className="profile-card__divider" />
+
+        <ul className="profile-card__info">
+          <li className="profile-card__info-row">
+            <span className="profile-card__info-icon">✉</span>
+            <div>
+              <span className="profile-card__info-label">Email</span>
+              <span className="profile-card__info-value">{email}</span>
+            </div>
+          </li>
+          <li className="profile-card__info-row">
+            <span className="profile-card__info-icon">📱</span>
+            <div>
+              <span className="profile-card__info-label">Mobile</span>
+              <span className="profile-card__info-value">{mobile}</span>
+            </div>
+          </li>
+          <li className="profile-card__info-row">
+            <span className="profile-card__info-icon">🔑</span>
+            <div>
+              <span className="profile-card__info-label">Role</span>
+              <span className="profile-card__info-value">{role}</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </>
   )
 }
 

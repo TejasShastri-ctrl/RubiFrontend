@@ -120,12 +120,12 @@ export default function Login() {
           </form>
 
           {/* Footer */}
-          <p className="mt-6 text-center text-xs">
+          {/* <p className="mt-6 text-center text-xs">
             Don’t have an account?{" "}
             <Link to="/register" className="cursor-pointer text-blue-600 hover:underline">
               Register
             </Link>
-          </p>
+          </p> */}
 
           <p className="mt-1 text-center text-xs">
             Having an issue?{" "}

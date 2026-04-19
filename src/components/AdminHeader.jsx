@@ -8,6 +8,8 @@ export function AdminHeader({
   showSearch = false,
   backLabel,
   onBack,
+  onProfileClick,
+  profileOpen = false,
 }) {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "null");
@@ -45,7 +47,12 @@ export function AdminHeader({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-        <div className="reviewer-chip reviewer-chip--compact">
+        <button
+          className={`reviewer-chip reviewer-chip--compact profile-btn ${profileOpen ? 'is-active' : ''}`}
+          onClick={onProfileClick}
+          title="View profile"
+          type="button"
+        >
           <div className="reviewer-avatar reviewer-avatar--compact">
             <Icon name="user" size={14} />
           </div>
@@ -53,7 +60,7 @@ export function AdminHeader({
             <div className="reviewer-name reviewer-name--compact">{displayName}</div>
             <div className="reviewer-role">{displayRole}</div>
           </div>
-        </div>
+        </button>
 
         <button 
           onClick={handleLogout}

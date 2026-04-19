@@ -1,7 +1,7 @@
 import { Icon } from './Icon'
 import { useNavigate } from 'react-router-dom'
 
-export function Navbar({ reviewer, searchValue, onSearchChange }) {
+export function Navbar({ reviewer, searchValue, onSearchChange, onProfileClick, profileOpen = false }) {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem("user") || "null");
   const displayName = user ? user.name : reviewer ? reviewer.name : "User";
@@ -27,7 +27,12 @@ export function Navbar({ reviewer, searchValue, onSearchChange }) {
       </label>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-        <div className="reviewer-chip">
+        <button
+          className={`reviewer-chip profile-btn ${profileOpen ? 'is-active' : ''}`}
+          onClick={onProfileClick}
+          title="View profile"
+          type="button"
+        >
           <div className="reviewer-avatar">
             <Icon name="user" size={16} />
           </div>
@@ -35,7 +40,7 @@ export function Navbar({ reviewer, searchValue, onSearchChange }) {
             <div className="reviewer-name">{displayName}</div>
             <div className="reviewer-role">{displayRole}</div>
           </div>
-        </div>
+        </button>
         
         <button 
           onClick={handleLogout}
