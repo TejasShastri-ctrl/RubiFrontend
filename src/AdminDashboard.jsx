@@ -14,7 +14,7 @@ const queueItems = [
   { id: 'under_review', label: 'Under Review', accent: 'purple' },
   { id: 'approved', label: 'Approved', accent: 'green' },
   { id: 'rejected', label: 'Rejected', accent: 'red' },
-  { id: 'pending', label: 'Pending', accent: 'amber' },
+  { id: 'pending', label: 'Unassigned', accent: 'amber' },
 ]
 
 const toolItems = [

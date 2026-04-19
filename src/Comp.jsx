@@ -148,7 +148,7 @@ function Dashboard() {
   const navItems = useMemo(() => [
     { id: 'overview', label: 'All Tasks', count: tasks.length, accent: 'blue' },
     { id: 'pending', label: 'Global Pool', count: tasks.filter(t => (t.status?.state === 'pending' || !t.status?.state) && !t.isLocked).length, accent: 'amber' },
-    { id: 'active', label: 'My Active Work', count: tasks.filter(t => t.status?.state === 'under_review' || t.isLocked).length, accent: 'indigo' },
+    { id: 'active', label: 'Under Review', count: tasks.filter(t => t.status?.state === 'under_review' || t.isLocked).length, accent: 'indigo' },
     { id: 'completed', label: 'Completed', count: tasks.filter(t => t.status?.state === 'approved').length, accent: 'green' },
     { id: 'rejected', label: 'Rejected', count: tasks.filter(t => t.status?.state === 'rejected').length, accent: 'red' },
   ], [tasks])
@@ -355,8 +355,8 @@ function ReviewDetailPage({
 
   const historyColumns = [
     { key: 'createdAt', label: 'Timestamp', render: (row) => new Date(row.createdAt).toLocaleString() },
-    { key: 'action', label: 'Action' },
-    { key: 'performedBy', label: 'Performed By' },
+    { key: 'action', label: 'Action', render: (row) => row.action.toUpperCase().replace('_', ' ') },
+    { key: 'performedBy', label: 'Performed By', render: (row) => row.performedBy?.name || 'Unknown' },
     { key: 'comment', label: 'Comment' },
   ]
 
