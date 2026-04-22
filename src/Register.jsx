@@ -1,7 +1,7 @@
 import { useState } from "react";
 import logo from "./assets/rubilogo.png";
 import { Lock, Mail, User, Phone, Briefcase } from "lucide-react";
-import axios from "axios";
+import api from "./api/api";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Register() {
@@ -26,7 +26,7 @@ export default function Register() {
     setError("");
 
     try {
-      const response = await axios.post("/api/auth/register", form);
+      const response = await api.post("/auth/register", form);
       console.log("Registration successful:", response.data);
       navigate("/"); // Redirect to login after successful registration
     } catch (err) {

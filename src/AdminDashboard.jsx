@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import axios from 'axios'
+import api from './api/api'
 import { reviewerProfile } from './data/mockData'
 import { AdminHeader } from './components/AdminHeader'
 import { AdminSidebar } from './components/AdminSidebar'
@@ -78,9 +78,7 @@ function AdminDashboard() {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get('/api/admin/stats', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const response = await api.get('/admin/stats')
       setReviewers(response.data.reviewers)
       setSummary(response.data.summary)
     } catch (err) {
@@ -157,9 +155,7 @@ function AdminDashboard() {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`/api/admin/tasks?status=${status}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const response = await api.get(`/admin/tasks?status=${status}`)
       setGlobalTasks(response.data)
     } catch (err) {
       console.error('Failed to fetch tasks:', err)
@@ -167,6 +163,50 @@ function AdminDashboard() {
       setLoading(false)
     }
   }
+
+  const filteredGlobalTasks = useMemo(() => {
+    const query = searchValue.trim().toLowerCase();
+    if (!query) return globalTasks;
+    return globalTasks.filter(t => {
+      try {
+        const idStr = String(t?._id || "").toLowerCase();
+        const promptStr = String(t?.aiPrompt || "").toLowerCase();
+        const outputStr = String(t?.aiOutput || "").toLowerCase();
+        const assigneeStr = String(t?.assignedTo?.name || "").toLowerCase();
+        
+        return idStr.includes(query) || 
+               promptStr.includes(query) || 
+               outputStr.includes(query) || 
+               assigneeStr.includes(query);
+      } catch (e) {
+        return false;
+      }
+    });
+  }, [globalTasks, searchValue]);
+
+  const filteredReviewerHistory = useMemo(() => {
+    const query = searchValue.trim().toLowerCase();
+    const all = [
+      ...(reviewerHistory?.approved || []),
+      ...(reviewerHistory?.rejected || []),
+      ...(reviewerHistory?.pending || []),
+      ...(reviewerHistory?.underReview || [])
+    ];
+    if (!query) return all;
+    return all.filter(t => {
+      try {
+        const idStr = String(t?._id || "").toLowerCase();
+        const promptStr = String(t?.aiPrompt || "").toLowerCase();
+        const outputStr = String(t?.aiOutput || "").toLowerCase();
+        
+        return idStr.includes(query) || 
+               promptStr.includes(query) || 
+               outputStr.includes(query);
+      } catch (e) {
+        return false;
+      }
+    });
+  }, [reviewerHistory, searchValue]);
 
   const handleToolSelect = (itemId) => {
     setActiveTool(itemId)
@@ -183,9 +223,7 @@ function AdminDashboard() {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`/api/admin/${reviewerId}/details`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const response = await api.get(`/admin/${reviewerId}/details`)
       setReviewerHistory(response.data)
     } catch (err) {
       console.error('Failed to fetch details:', err)
@@ -207,9 +245,7 @@ function AdminDashboard() {
     // Fetch logs for history
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get(`/api/reviews/${record._id}/logs`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const response = await api.get(`/reviews/${record._id}/logs`)
       setRecordLogs(response.data)
     } catch (err) {
       console.error('Failed to fetch logs:', err)
@@ -219,9 +255,7 @@ function AdminDashboard() {
   const handleReassign = async (reviewId, reviewerId) => {
     try {
       const token = localStorage.getItem('token')
-      await axios.post(`/api/admin/${reviewId}/reassign`, { reviewerId }, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      await api.post(`/admin/${reviewId}/reassign`, { reviewerId })
       fetchStats()
       if (selectedReviewerId) fetchReviewerDetails(selectedReviewerId)
       setScreen('history')
@@ -239,12 +273,10 @@ function AdminDashboard() {
     const { reviewId, action } = modalConfig;
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`/api/admin/${reviewId}/modify`, { 
+      await api.post(`/admin/${reviewId}/modify`, { 
         decision: action, 
         comment,
         target: action === 'send_back' ? target : 'reviewer'
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       });
 
       setModalOpen(false);
@@ -252,12 +284,12 @@ function AdminDashboard() {
       if (selectedReviewerId) fetchReviewerDetails(selectedReviewerId);
       fetchStats();
       if (selectedRecord && selectedRecord._id === reviewId) {
-        const refreshRes = await axios.get('/api/admin/tasks', { headers: { Authorization: `Bearer ${token}` } });
+        const refreshRes = await api.get('/admin/tasks');
         const updatedRecord = refreshRes.data.find(r => r._id === reviewId);
         if (updatedRecord) {
              setSelectedRecord(updatedRecord);
              // Also refresh logs
-             const logsRes = await axios.get(`/api/reviews/${reviewId}/logs`, { headers: { Authorization: `Bearer ${token}` } });
+             const logsRes = await api.get(`/reviews/${reviewId}/logs`);
              setRecordLogs(logsRes.data);
         }
       }
@@ -285,7 +317,7 @@ function AdminDashboard() {
           reviewer={reviewerProfile}
           searchValue={searchValue}
           onSearchChange={setSearchValue}
-          showSearch={screen === 'overview'}
+          showSearch={['overview', 'tasks', 'history'].includes(screen)}
           backLabel={
             screen === 'history'
               ? 'Go Back'
@@ -295,7 +327,7 @@ function AdminDashboard() {
           }
           onBack={
             screen === 'history'
-              ? () => setScreen('overview')
+              ? () => { setScreen('overview'); setSearchValue(''); }
               : screen === 'detail'
                 ? () => setScreen(selectedReviewerId ? 'history' : 'overview')
                 : undefined
@@ -315,7 +347,7 @@ function AdminDashboard() {
           {screen === 'tasks' ? (
             <AdminGlobalQueue
               title={`${activeQueue.charAt(0).toUpperCase() + activeQueue.slice(1).replace('_', ' ')} Tasks`}
-              tasks={globalTasks}
+              tasks={filteredGlobalTasks}
               onRecordSelect={openRecordDetail}
             />
           ) : null}
@@ -323,7 +355,7 @@ function AdminDashboard() {
           {screen === 'history' ? (
             <AdminHistory
               reviewer={selectedReviewer}
-              history={reviewerHistory}
+              history={filteredReviewerHistory}
               onRecordSelect={openRecordDetail}
             />
           ) : null}
@@ -390,14 +422,6 @@ function AdminOverview({ reviewers, onReviewerSelect }) {
 }
 
 function AdminHistory({ reviewer, history, onRecordSelect }) {
-  // Combine approved, rejected, pending, underReview into one list
-  const allHistory = [
-    ...(history.approved || []),
-    ...(history.rejected || []),
-    ...(history.pending || []),
-    ...(history.underReview || [])
-  ];
-
   return (
     <div className="admin-screen admin-screen--panel">
       <div className="admin-history-head">
@@ -413,7 +437,7 @@ function AdminHistory({ reviewer, history, onRecordSelect }) {
       <section className="admin-table-card admin-table-card--soft">
         <DataTable
           columns={historyColumns}
-          rows={allHistory}
+          rows={history}
           onRowClick={(row) => onRecordSelect(row)}
         />
       </section>
@@ -679,7 +703,7 @@ function UserRegistration() {
     setSuccess("");
 
     try {
-      const response = await axios.post("/api/auth/register", form);
+      const response = await api.post("/auth/register", form);
       console.log("Registration successful:", response.data);
       setSuccess("User created successfully!");
       setForm({ name: "", email: "", password: "", role: "reviewer" });
@@ -855,9 +879,7 @@ function NewReviewForm() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post("/api/reviews", form, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.post("/reviews", form);
       console.log("Task created:", response.data);
       setSuccess("Review task added successfully to the global pool!");
       setForm({ aiPrompt: "", aiOutput: "" });
@@ -1036,9 +1058,7 @@ function BulkUploadView() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post("/api/reviews/bulk", { tasks: preview }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await api.post("/reviews/bulk", { tasks: preview });
       setSuccess(`${response.data.count} tasks successfully added to the global pool!`);
       setPreview([]);
       setFile(null);

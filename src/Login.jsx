@@ -1,7 +1,7 @@
 import { useState } from "react";
 import logo from "./assets/rubilogo.png";
 import { Lock, Mail } from "lucide-react";
-import axios from "axios";
+import api from "./api/api";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
@@ -24,7 +24,7 @@ export default function Login() {
     setError("");
 
     try {
-      const response = await axios.post("/api/auth/login", form);
+      const response = await api.post("/auth/login", form);
       const { token, user } = response.data;
       
       // Store in localStorage

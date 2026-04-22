@@ -24,26 +24,36 @@ export function AdminHeader({
 
   return (
     <header className="admin-topbar">
-      <div className="admin-topbar__left">
-        {showSearch ? (
-          <label className="admin-searchbar" htmlFor="admin-search">
-            <Icon name="search" size={14} />
-            <input
-              id="admin-search"
-              type="search"
-              placeholder="search"
-              value={searchValue}
-              onChange={(event) => onSearchChange(event.target.value)}
-            />
-          </label>
-        ) : null}
-
-        {!showSearch && onBack ? (
+      <div className="admin-topbar__left" style={{ flex: 1 }}>
+        {onBack && (
           <button className="admin-back" type="button" onClick={onBack}>
             <Icon name="arrow-left" size={16} />
             <span>{backLabel}</span>
           </button>
-        ) : null}
+        )}
+
+        {showSearch && (
+          <label 
+            className="admin-searchbar" 
+            htmlFor="admin-search"
+            style={{ 
+              flex: 1, 
+              maxWidth: '400px', 
+              marginLeft: onBack ? '20px' : '0',
+              border: '1.5px solid #2f6fed' // Adding a distinct border to ensure visibility
+            }}
+          >
+            <Icon name="search" size={14} />
+            <input
+              id="admin-search"
+              type="search"
+              placeholder="Search by ID, prompt, or output..."
+              value={searchValue}
+              onChange={(event) => onSearchChange(event.target.value)}
+              autoComplete="off"
+            />
+          </label>
+        )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>

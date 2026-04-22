@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
-import axios from 'axios'
+import api from './api/api'
 import {
   auditEvents,
   reviewerProfile,
@@ -49,10 +49,7 @@ function Dashboard() {
 
   const fetchLogs = async (taskId) => {
     try {
-      const token = localStorage.getItem('token')
-      const response = await axios.get(`/api/reviews/${taskId}/logs`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const response = await api.get(`/reviews/${taskId}/logs`)
       setHistory(response.data)
     } catch (err) {
       console.error('Failed to fetch logs:', err)
@@ -73,9 +70,7 @@ function Dashboard() {
     setLoading(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await axios.get('/api/reviews', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const response = await api.get('/reviews')
       setTasks(response.data)
     } catch (err) {
       console.error('Failed to fetch tasks:', err)
@@ -93,9 +88,7 @@ function Dashboard() {
   const handleLockTask = async () => {
     try {
       const token = localStorage.getItem('token')
-      await axios.post(`/api/reviews/${selectedTaskId}/lock`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      await api.post(`/reviews/${selectedTaskId}/lock`, {})
       await fetchTasks()
     } catch (err) {
       console.error('Failed to lock task:', err)
@@ -106,9 +99,7 @@ function Dashboard() {
   const handleUnlockTask = async () => {
     try {
       const token = localStorage.getItem('token')
-      await axios.post(`/api/reviews/${selectedTaskId}/unlock`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      await api.post(`/reviews/${selectedTaskId}/unlock`, {})
       await fetchTasks();
       setSelectedTaskId(null)
       setActivePage('overview')
@@ -125,11 +116,9 @@ function Dashboard() {
       const token = localStorage.getItem('token')
       const comment = reviewerComment || `${decision.charAt(0).toUpperCase() + decision.slice(1)} by reviewer`;
       
-      await axios.post(`/api/reviews/${selectedTaskId}/submit`, { 
+      await api.post(`/reviews/${selectedTaskId}/submit`, { 
         decision, 
         comment
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
       })
       
       // Clear state and refresh
