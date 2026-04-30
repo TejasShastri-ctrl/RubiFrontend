@@ -1,3 +1,4 @@
+import logo from "../assets/rubilogo.png";
 import { Icon } from './Icon'
 
 export function AdminSidebar({
@@ -11,10 +12,11 @@ export function AdminSidebar({
 }) {
   return (
     <aside className="admin-sidebar">
-      <div className="admin-sidebar__brand">
+      <div className="admin-sidebar__brand flex gap-1 items-center">
         <div className="brand-mark brand-mark--admin">
-          <Icon name="grid" size={18} />
+          <img src={logo} alt="logo here" className="size-4" />
         </div>
+        HITL Workflow
       </div>
 
       <div className="admin-sidebar__group">

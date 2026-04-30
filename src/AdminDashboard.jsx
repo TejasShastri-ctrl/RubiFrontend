@@ -18,9 +18,9 @@ const queueItems = [
 ]
 
 const toolItems = [
-  { id: 'analytics', label: 'Analytics' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'help', label: 'Help' },
+  // { id: 'analytics', label: 'Analytics' },
+  // { id: 'settings', label: 'Settings' },
+  // { id: 'help', label: 'Help' },
   { id: 'createUser', label: 'Create User' },
   { id: 'addReview', label: 'Add Review Task' },
   { id: 'bulkUpload', label: 'Bulk CSV Upload' },
@@ -303,7 +303,7 @@ function AdminDashboard() {
   return (
     <div className="admin-shell">
       <AdminSidebar
-        brand="Rubiscape"
+        brand="Human in the loop workflow"
         queueItems={dynamicQueueItems}
         toolItems={toolItems}
         activeQueue={activeQueue}

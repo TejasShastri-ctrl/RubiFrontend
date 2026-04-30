@@ -156,8 +156,8 @@ export default function Login() {
             </div>
           </div>
 
-          <p className="text-3xl font-light tracking-wide text-stone-800 mt-20">
-            WORKFLOW APPROVAL PORTAL
+          <p className="text-3xl font-bold tracking-normal text-stone-800 mt-20">
+            Human-In-The-Loop Approval Workflow
           </p>
         </div>
       </div>

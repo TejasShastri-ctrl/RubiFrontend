@@ -902,7 +902,7 @@ body {
 }
 
 .admin-shell {
-  min-height: 100vh;
+  max-height: 100vh;
   display: grid;
   grid-template-columns: 230px minmax(0, 1fr);
   background: #f7f7f5;

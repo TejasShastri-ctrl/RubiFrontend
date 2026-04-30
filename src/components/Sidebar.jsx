@@ -15,7 +15,7 @@ export function Sidebar({
         </div>
         <div>
           <div className="brand-name">{brand}</div>
-          <div className="brand-copy">HITL AI Review</div>
+          {/* <div className="brand-copy">HITL AI Review</div> */}
         </div>
       </div>
 
@@ -38,7 +38,8 @@ export function Sidebar({
         </nav>
       </div>
 
-      <div className="sidebar__group">
+      {secondaryItems.length > 0 && (
+        <div className="sidebar__group">
         <div className="sidebar__label">Tools</div>
         <nav className="sidebar__nav sidebar__nav--secondary">
           {secondaryItems.map((item) => (
@@ -55,6 +56,7 @@ export function Sidebar({
           ))}
         </nav>
       </div>
+      )}
     </aside>
   )
 }

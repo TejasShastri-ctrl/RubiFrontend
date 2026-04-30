@@ -168,7 +168,7 @@ function Dashboard() {
   return (
     <div className="app-shell">
       <Sidebar
-        brand="Rubiscape"
+        brand="HITL AI Review"
         navItems={navItems}
         secondaryItems={[]}
         activeItem={activePage}
