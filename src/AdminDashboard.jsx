@@ -7,6 +7,7 @@ import { Button } from './components/Button'
 import { DataTable } from './components/DataTable'
 import { InfoPair } from './components/InfoPair'
 import { StatusPill } from './components/StatusPill'
+import io from 'socket.io-client'
 
 const queueItems = [
   { id: 'all_reviewers', label: 'All Reviewers', accent: 'slate' },
@@ -75,6 +76,23 @@ function AdminDashboard() {
   useEffect(() => {
     fetchStats()
   }, [])
+
+  // Socket.IO connection for real-time updates
+  useEffect(() => {
+    const socket = io('http://localhost:5000') // Backend URL
+
+    socket.on('userActivity', (data) => {
+      console.log('User activity:', data)
+      // Refresh user logs if currently viewing the user logs screen
+      if (screen === 'userLogs') {
+        fetchUserLogs()
+      }
+    })
+
+    return () => {
+      socket.disconnect()
+    }
+  }, [screen]) // Depend on screen to re-run when screen changes
 
   const fetchStats = async () => {
     setLoading(true)

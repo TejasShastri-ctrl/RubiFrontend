@@ -15,6 +15,7 @@ import { Panel } from './components/Panel'
 import { Button } from './components/Button'
 import { ActivityList } from './components/ActivityList'
 import { StatusPill } from './components/StatusPill'
+import io from 'socket.io-client'
 
 const tableColumns = [
   {
@@ -64,6 +65,27 @@ function Dashboard() {
 
   useEffect(() => {
     fetchTasks()
+  }, [])
+
+  // Socket.IO connection for real-time task updates
+  useEffect(() => {
+    const socket = io('http://localhost:5000') // Backend URL
+
+    socket.on('reviewLocked', (data) => {
+      console.log('Review locked by another reviewer:', data)
+      // Refresh tasks to hide the locked task from this reviewer's view
+      fetchTasks()
+    })
+
+    socket.on('reviewUnlocked', (data) => {
+      console.log('Review unlocked:', data)
+      // Refresh tasks to show the unlocked task again
+      fetchTasks()
+    })
+
+    return () => {
+      socket.disconnect()
+    }
   }, [])
 
   const fetchTasks = async () => {
