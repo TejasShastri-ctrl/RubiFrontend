@@ -27,8 +27,7 @@ export default function Login() {
       const response = await api.post("/auth/login", form);
       const { token, user } = response.data;
       
-      // Store in localStorage
-      localStorage.setItem("token", token);
+      // Store user info in localStorage, but NOT the token (which is in HttpOnly cookie)
       localStorage.setItem("user", JSON.stringify(user));
 
       console.log("Login successful, role:", user.role);

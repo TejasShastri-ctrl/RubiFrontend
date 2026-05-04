@@ -79,7 +79,8 @@ function AdminDashboard() {
 
   // Socket.IO connection for real-time updates
   useEffect(() => {
-    const socket = io('https://rubiscape-backend.onrender.com') // Backend URL
+    const socketUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
+    const socket = io(socketUrl, { withCredentials: true }) // Dynamic Backend URL
 
     socket.on('userActivity', (data) => {
       console.log('User activity:', data)
@@ -1277,7 +1278,7 @@ function UserLogsView({ logs }) {
         return `${mins}m ${secs}s`;
       }
     },
-    { key: 'ipAddress', label: 'IP Address' },
+    // { key: 'ipAddress', label: 'IP Address' },
     { 
       key: 'status', 
       label: 'Status', 

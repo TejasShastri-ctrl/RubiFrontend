@@ -25,7 +25,6 @@ export function AdminHeader({
     } catch (err) {
       console.error("Logout log failed:", err);
     } finally {
-      localStorage.removeItem("token");
       localStorage.removeItem("user");
       navigate("/");
     }

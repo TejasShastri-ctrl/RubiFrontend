@@ -6,11 +6,14 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true, // Send cookies with every request
 });
 
-// Add a request interceptor to include the JWT token
+// Add a request interceptor to include the JWT token (fallback if needed, but not required with cookies)
 api.interceptors.request.use(
   (config) => {
+    // We no longer rely on localStorage token for credentials as we use HttpOnly cookies,
+    // but we can still attach it if it exists for backwards compatibility
     const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

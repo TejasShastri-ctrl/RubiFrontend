@@ -69,7 +69,8 @@ function Dashboard() {
 
   // Socket.IO connection for real-time task updates
   useEffect(() => {
-    const socket = io('https://rubiscape-backend.onrender.com') // Backend URL
+    const socketUrl = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:5000';
+    const socket = io(socketUrl, { withCredentials: true }) // Dynamic Backend URL
 
     socket.on('reviewLocked', (data) => {
       console.log('Review locked by another reviewer:', data)
